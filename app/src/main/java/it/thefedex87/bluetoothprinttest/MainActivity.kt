@@ -36,6 +36,8 @@ class MainActivity : AppCompatActivity() {
     private var bluetoothAdapter: BluetoothAdapter? = null
     private lateinit var bluetoothScanner: BluetoothLeScanner
 
+    private lateinit var bluetoothDevice: BluetoothDevice
+
     private val btLeScanCallback: ScanCallback = @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
@@ -87,6 +89,22 @@ class MainActivity : AppCompatActivity() {
                     )
                 }"
             )
+            when (intent?.extras?.get(EXTRA_BOND_STATE)) {
+                BOND_NONE -> {
+
+                }
+                BOND_BONDING -> {
+
+                }
+                BOND_BONDED -> {
+                    bluetoothDevice.connectGatt(
+                        this@MainActivity,
+                        false,
+                        bluetoothGattConnect,
+                        BluetoothDevice.TRANSPORT_LE
+                    )
+                }
+            }
         }
     }
 
@@ -97,7 +115,11 @@ class MainActivity : AppCompatActivity() {
 
         registerReceiver(bondBroadcastReceiver, IntentFilter(ACTION_BOND_STATE_CHANGED))
 
-        Printooth.init(this)
+        //Printooth.init(this)
+
+        bluetoothManager = ContextCompat.getSystemService(this, BluetoothManager::class.java)
+        bluetoothAdapter = bluetoothManager?.adapter
+        bluetoothScanner = bluetoothAdapter!!.bluetoothLeScanner
 
         selectImageResultLauncher =
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -106,22 +128,31 @@ class MainActivity : AppCompatActivity() {
 
         val buttonScan = findViewById<Button>(R.id.button_scan)
         buttonScan.setOnClickListener {
-            bluetoothManager = ContextCompat.getSystemService(this, BluetoothManager::class.java)
-            bluetoothAdapter = bluetoothManager?.adapter
-            bluetoothScanner = bluetoothAdapter!!.bluetoothLeScanner
-            bluetoothScanner.startScan(btLeScanCallback)
-            lifecycleScope.launchWhenStarted {
-                delay(5000)
-                bluetoothScanner.stopScan(btLeScanCallback)
+            val bondedDevices = bluetoothAdapter!!.bondedDevices
+            if (bondedDevices.any { it.name?.contains("STAR") ?: false }) {
+                val printer = bondedDevices.first { it.name?.contains("STAR") ?: false }
+                printer.connectGatt(
+                    this@MainActivity,
+                    false,
+                    bluetoothGattConnect,
+                    BluetoothDevice.TRANSPORT_LE
+                )
+            } else {
+                bluetoothScanner.startScan(btLeScanCallback)
+                lifecycleScope.launchWhenStarted {
+                    delay(5000)
+                    bluetoothScanner.stopScan(btLeScanCallback)
 
-                //Log.d("BT_TEST", btDeviceList.map { it.name }.toString())
-                val printer = btDeviceList.firstOrNull { it.name?.contains("STAR") ?: false }
-                printer?.let {
-                    Log.d("BT_TEST", "Bond state: ${it.bondState}")
-                    if (it.bondState == BOND_NONE) {
+                    //Log.d("BT_TEST", btDeviceList.map { it.name }.toString())
+                    val printer = btDeviceList.firstOrNull { it.name?.contains("STAR") ?: false }
+                    printer?.let {
+                        Log.d("BT_TEST", "Bond state: ${it.bondState}")
+                        bluetoothDevice = it
+                        //if (it.bondState == BOND_NONE) {
                         it.createBond()
+                        //}
+                        //it.connectGatt(this@MainActivity, false, bluetoothGattConnect, BluetoothDevice.TRANSPORT_LE)
                     }
-                    //it.connectGatt(this@MainActivity, false, bluetoothGattConnect, BluetoothDevice.TRANSPORT_LE)
                 }
             }
         }
@@ -147,14 +178,15 @@ class MainActivity : AppCompatActivity() {
                 builder.appendAlignment(ICommandBuilder.AlignmentPosition.Center)
                 builder.append(("Print test\nBoh\n").toByteArray(encoding))
 
-                builder.appendBarcode(("{B123456.").toByteArray(Charset.forName("US-ASCII")),
+                builder.appendBarcode(
+                    ("{B123456.").toByteArray(Charset.forName("US-ASCII")),
                     ICommandBuilder.BarcodeSymbology.Code128,
                     ICommandBuilder.BarcodeWidth.Mode2,
                     40,
                     true
                 )
 
-                builder.appendMultiple(("Prova\n").toByteArray(encoding),2 ,1)
+                builder.appendMultiple(("Prova\n").toByteArray(encoding), 2, 1)
 
                 builder.appendEmphasis(("Altra prova\n").toByteArray(encoding))
 
