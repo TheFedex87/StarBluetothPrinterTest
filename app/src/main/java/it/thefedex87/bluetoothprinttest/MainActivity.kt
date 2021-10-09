@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.snackbar.Snackbar
 import com.mazenrashed.printooth.Printooth
+import com.mazenrashed.printooth.ui.ScanningActivity
 import com.starmicronics.stario.StarIOPort
 import com.starmicronics.starioextension.ICommandBuilder
 import com.starmicronics.starioextension.StarIoExt
@@ -38,7 +39,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var bluetoothDevice: BluetoothDevice
 
-    private val btLeScanCallback: ScanCallback = @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+    private val btLeScanCallback: ScanCallback =
     object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             super.onScanResult(callbackType, result)
@@ -115,21 +116,24 @@ class MainActivity : AppCompatActivity() {
 
         registerReceiver(bondBroadcastReceiver, IntentFilter(ACTION_BOND_STATE_CHANGED))
 
-        //Printooth.init(this)
+        /*Printooth.init(this)
+        selectImageResultLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+
+            }
+        selectImageResultLauncher.launch(Intent(this, ScanningActivity::class.java))*/
 
         bluetoothManager = ContextCompat.getSystemService(this, BluetoothManager::class.java)
         bluetoothAdapter = bluetoothManager?.adapter
         bluetoothScanner = bluetoothAdapter!!.bluetoothLeScanner
 
-        selectImageResultLauncher =
-            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
 
-            }
 
         val buttonScan = findViewById<Button>(R.id.button_scan)
         buttonScan.setOnClickListener {
             val bondedDevices = bluetoothAdapter!!.bondedDevices
             if (bondedDevices.any { it.name?.contains("STAR") ?: false }) {
+                Log.d("BT_TEST", "Device bounded")
                 val printer = bondedDevices.first { it.name?.contains("STAR") ?: false }
                 printer.connectGatt(
                     this@MainActivity,
@@ -138,12 +142,13 @@ class MainActivity : AppCompatActivity() {
                     BluetoothDevice.TRANSPORT_LE
                 )
             } else {
+                Log.d("BT_TEST", "Device not bounded")
                 bluetoothScanner.startScan(btLeScanCallback)
                 lifecycleScope.launchWhenStarted {
                     delay(5000)
                     bluetoothScanner.stopScan(btLeScanCallback)
 
-                    //Log.d("BT_TEST", btDeviceList.map { it.name }.toString())
+                    Log.d("BT_TEST", btDeviceList.map { it.name }.toString())
                     val printer = btDeviceList.firstOrNull { it.name?.contains("STAR") ?: false }
                     printer?.let {
                         Log.d("BT_TEST", "Bond state: ${it.bondState}")
